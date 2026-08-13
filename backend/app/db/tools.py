@@ -141,6 +141,7 @@ class SQLAlchemyToolRequestRepository:
         influences: list[ProvenanceRecord],
     ) -> ToolRequest:
         self._session.add(request)
+        await self._session.flush()
         self._session.add_all(
             ToolRequestInfluence(
                 id=uuid4(),

@@ -12,6 +12,8 @@ from app.db.tools import (
     _registry_row,
     verify_or_install_tool_manifest,
 )
+from app.models.provenance import ProvenanceRecord, ToolRequestInfluence
+from app.models.tool import ToolRequest
 from app.tools.registry import STATIC_TOOL_REGISTRY
 
 
@@ -139,3 +141,38 @@ async def test_sql_repository_reports_limit_without_increment_return() -> None:
 
     assert result.allowed is False
     assert result.request_count == 2
+
+
+async def test_tool_request_parent_is_flushed_before_influence_rows() -> None:
+    session = MagicMock()
+    events: list[tuple[str, object]] = []
+    session.add.side_effect = lambda value: events.append(("add", value))
+
+    async def record_flush() -> None:
+        events.append(("flush", None))
+
+    def record_add_all(values: object) -> None:
+        events.append(("add_all", list(values)))  # type: ignore[arg-type]
+
+    session.flush = AsyncMock(side_effect=record_flush)
+    session.add_all.side_effect = record_add_all
+    session.commit = AsyncMock()
+    session.refresh = AsyncMock()
+    repository = SQLAlchemyToolRequestRepository(session)
+    request = ToolRequest(id=uuid4())
+    influence = ProvenanceRecord(id=uuid4())
+
+    await repository.create_tool_request(request, [influence])
+
+    assert events[0] == ("add", request)
+    assert events[1] == ("flush", None)
+    assert events[2][0] == "add_all"
+    children = events[2][1]
+    assert isinstance(children, list)
+    assert len(children) == 1
+    assert isinstance(children[0], ToolRequestInfluence)
+    assert children[0].tool_request_id == request.id
+    assert children[0].provenance_record_id == influence.id
+    session.flush.assert_awaited_once()
+    session.commit.assert_awaited_once()
+    session.refresh.assert_awaited_once_with(request)
