@@ -33,6 +33,18 @@ def test_compose_keeps_database_internal_and_bounds_services() -> None:
     assert "./evaluations/scenarios:/evaluations/scenarios:ro" in api["volumes"]
     assert "./scripts:/scripts:ro" in api["volumes"]
     assert "evaluation-reports:/evaluations/reports" in api["volumes"]
+    assert api["pre_start"] == [
+        {
+            "command": [
+                "chown",
+                "10001:10001",
+                "/audit-checkpoint",
+                "/evaluations/reports",
+            ],
+            "user": "root",
+            "privileged": False,
+        }
+    ]
     assert "audit-checkpoint" in compose["volumes"]
     assert "evaluation-reports" in compose["volumes"]
     assert opa["image"] == "openpolicyagent/opa:1.18.2-static"
