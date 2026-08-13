@@ -72,11 +72,16 @@ class SQLAlchemyIdentityRepository:
         capabilities: list[str],
         trusted_intent: ProvenanceRecord,
     ) -> tuple[Task, list[str]]:
-        self._session.add_all([task, trusted_intent])
-        self._session.add_all(
-            TaskCapability(task_id=task.id, capability=capability) for capability in capabilities
-        )
+        self._session.add(task)
         try:
+            await self._session.flush()
+            self._session.add_all(
+                [trusted_intent]
+                + [
+                    TaskCapability(task_id=task.id, capability=capability)
+                    for capability in capabilities
+                ]
+            )
             await self._session.commit()
             await self._session.refresh(task)
         except IntegrityError as exc:
