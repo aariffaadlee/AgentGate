@@ -1,15 +1,18 @@
 """Administrator-only HTTP contract tests for Phase 4 approvals."""
 
 from pathlib import Path
+from typing import Any
 from uuid import UUID, uuid4
+
+import pytest
 
 from app.api.approvals import get_approval_service
 from app.api.identity import get_identity_service
 from app.auth.tokens import TokenService
 from app.config import Settings
 from app.main import create_app
-from app.services.approvals import ApprovalService
-from app.services.identity import IdentityService
+from app.services.approvals import ApprovalRecord, ApprovalService
+from app.services.identity import AdminPrincipal, IdentityService
 from app.services.tools import ToolRequestCommand, ToolRequestService
 from tests.support import app_client, install_recording_audit
 from tests.test_approval_service import FakeApprovalRepository
@@ -168,3 +171,50 @@ async def test_admin_rejection_is_terminal_and_never_dispatches(
         "approval.rejected",
         "tool.denied",
     ]
+
+
+@pytest.mark.parametrize(
+    ("action", "expected_event"),
+    [("approve", "approval.consumed"), ("reject", "approval.rejected")],
+)
+async def test_approval_audit_uses_admin_id_snapshotted_before_transaction_expiration(
+    tmp_path: Path,
+    settings: Settings,
+    action: str,
+    expected_event: str,
+) -> None:
+    application, pending, admin_token, _workload_token, _mailbox = await _pending_application(
+        tmp_path, settings
+    )
+    approval = pending.approval
+    assert approval is not None
+    administrator_id = TokenService(settings).decode_admin_token(admin_token).sub
+    delegate = application.dependency_overrides[get_approval_service]()
+
+    class ExpiringApprovalService:
+        async def approve(self, **kwargs: Any) -> ApprovalRecord:
+            record = await delegate.approve(**kwargs)
+            principal: AdminPrincipal = kwargs["administrator"]
+            principal.administrator.__dict__.pop("id", None)
+            return record
+
+        async def reject(self, **kwargs: Any) -> ApprovalRecord:
+            record = await delegate.reject(**kwargs)
+            principal: AdminPrincipal = kwargs["administrator"]
+            principal.administrator.__dict__.pop("id", None)
+            return record
+
+    application.dependency_overrides[get_approval_service] = ExpiringApprovalService
+    body = {"argument_hash": approval.argument_hash} if action == "approve" else {}
+
+    async with app_client(application) as client:
+        response = await client.post(
+            f"/approvals/{approval.id}/{action}",
+            json=body,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+
+    assert response.status_code == 200
+    events = application.state.recording_audit.events
+    assert events[0].event_type == expected_event
+    assert all(event.actor_id == administrator_id for event in events)

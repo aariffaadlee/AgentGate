@@ -95,6 +95,7 @@ async def approve_request(
 ) -> ApprovalResponse:
     """Approve the displayed hash, re-run policy, consume, then dispatch once."""
 
+    administrator_id = administrator.administrator.id
     record = await service.approve(
         approval_id=approval_id,
         expected_argument_hash=body.argument_hash,
@@ -104,7 +105,7 @@ async def approve_request(
     await audit.append(
         *approval_outcome_events(
             record,
-            administrator_id=administrator.administrator.id,
+            administrator_id=administrator_id,
             action="consumed",
             reason_present=body.reason is not None,
         )
@@ -122,6 +123,7 @@ async def reject_request(
 ) -> ApprovalResponse:
     """Reject the exact pending request without dispatching its adapter."""
 
+    administrator_id = administrator.administrator.id
     record = await service.reject(
         approval_id=approval_id,
         administrator=administrator,
@@ -130,7 +132,7 @@ async def reject_request(
     await audit.append(
         *approval_outcome_events(
             record,
-            administrator_id=administrator.administrator.id,
+            administrator_id=administrator_id,
             action="rejected",
             reason_present=body.reason is not None,
         )
