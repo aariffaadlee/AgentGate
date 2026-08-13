@@ -37,7 +37,7 @@ services:
         - CMD
         - /opa
         - eval
-        - --fail-defined
+        - --fail
         - --data
         - /policies/agentgate.rego
         - data.agentgate.authorization.decision
