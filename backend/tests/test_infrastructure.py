@@ -53,10 +53,9 @@ def test_compose_keeps_database_internal_and_bounds_services() -> None:
     assert volume_init["cap_add"] == ["CHOWN"]
     assert volume_init["security_opt"] == ["no-new-privileges:true"]
     assert volume_init["restart"] == "no"
-    assert api["depends_on"]["volume-init"]["condition"] == (
-        "service_completed_successfully"
-    )
+    assert api["depends_on"]["volume-init"]["condition"] == ("service_completed_successfully")
     assert "pre_start" not in api
+    assert api["tmpfs"] == ["/tmp:size=16m,mode=1770,uid=10001,gid=10001"]
     assert "audit-checkpoint" in compose["volumes"]
     assert "evaluation-reports" in compose["volumes"]
     assert opa["image"] == "openpolicyagent/opa:1.18.2-static"

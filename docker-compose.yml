@@ -146,7 +146,7 @@ services:
       - agentgate-edge
     read_only: true
     tmpfs:
-      - /tmp:size=16m,mode=1770
+      - /tmp:size=16m,mode=1770,uid=10001,gid=10001
     volumes:
       - ./synthetic_data/documents.json:/synthetic_data/documents.json:ro
       - ./synthetic_data/tickets.json:/synthetic_data/tickets.json:ro
