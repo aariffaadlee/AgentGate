@@ -1,0 +1,44 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+.pytest-runtime/
+.tmp*/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Frontend (Phase 8)
+node_modules/
+frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
+
+# Runtime data and generated reports
+audit-checkpoints/
+evaluations/reports/*.json
+evaluations/reports/*.md
+!evaluations/reports/evaluation-7b8896fe-4d93-470e-b862-542409cbc628.json
+!evaluations/reports/evaluation-7b8896fe-4d93-470e-b862-542409cbc628.md
+synthetic_data/sandbox/runtime/
+
+# Editor and operating system
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

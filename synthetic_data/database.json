@@ -1,0 +1,39 @@
+{
+  "assets": [
+    {
+      "record_id": "LAP-001",
+      "name": "Security Lab Laptop 1",
+      "owner": "Amina Student",
+      "status": "active"
+    },
+    {
+      "record_id": "LAP-002",
+      "name": "Security Lab Laptop 2",
+      "owner": "Daniel Trainee",
+      "status": "maintenance"
+    },
+    {
+      "record_id": "LAP-003",
+      "name": "Security Lab Laptop 3",
+      "owner": "Daniel Trainee",
+      "status": "active"
+    }
+  ],
+  "users": [
+    {
+      "record_id": "USR-001",
+      "name": "Amina Student",
+      "department": "Security Lab"
+    },
+    {
+      "record_id": "USR-002",
+      "name": "Daniel Trainee",
+      "department": "Security Lab"
+    },
+    {
+      "record_id": "USR-003",
+      "name": "Rina Instructor",
+      "department": "Training"
+    }
+  ]
+}

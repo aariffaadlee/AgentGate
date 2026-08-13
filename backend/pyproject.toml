@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentgate-backend"
+version = "0.1.0"
+description = "Zero Trust security runtime for AI agent tool calls"
+requires-python = ">=3.12"
+dependencies = [
+  "alembic==1.19.1",
+  "asyncpg==0.31.0",
+  "cryptography==50.0.0",
+  "fastapi==0.141.1",
+  "httpx==0.28.1",
+  "pydantic==2.13.4",
+  "pydantic-settings==2.15.0",
+  "PyJWT==2.13.0",
+  "sqlalchemy[asyncio]==2.0.51",
+  "structlog==26.1.0",
+  "uvicorn[standard]==0.52.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "bandit==1.9.4",
+  "mypy==2.3.0",
+  "pip-audit==2.10.1",
+  "PyYAML==6.0.3",
+  "pytest==9.1.1",
+  "pytest-asyncio==1.4.0",
+  "pytest-cov==7.1.0",
+  "ruff==0.16.2",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+addopts = "--strict-config --strict-markers --cov=app --cov-branch --cov-report=term-missing"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["ASYNC", "B", "E", "F", "I", "RUF", "SIM", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "demo_agent"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+strict = true
+warn_unreachable = true
+exclude = ["^tests/"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.bandit]
+exclude_dirs = ["migrations", "tests"]
+skips = []

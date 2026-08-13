@@ -1,0 +1,174 @@
+name: agentgate
+
+services:
+  postgres:
+    image: postgres:18.4-alpine3.24
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agentgate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-agentgate}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    networks:
+      - agentgate-internal
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 200
+    restart: unless-stopped
+
+  opa:
+    image: openpolicyagent/opa:1.18.2-static
+    command:
+      - run
+      - --server
+      - --addr=0.0.0.0:8181
+      - --log-format=json
+      - /policies/agentgate.rego
+    healthcheck:
+      test:
+        - CMD
+        - /opa
+        - eval
+        - --fail-defined
+        - --data
+        - /policies/agentgate.rego
+        - data.agentgate.authorization.decision
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 3s
+    networks:
+      - agentgate-internal
+    volumes:
+      - ./policies:/policies:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=8m,mode=1770
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 50
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      AGENTGATE_ENVIRONMENT: ${AGENTGATE_ENVIRONMENT:-development}
+      AGENTGATE_DATABASE_URL: ${AGENTGATE_DATABASE_URL:?Copy .env.example to .env and set AGENTGATE_DATABASE_URL}
+      AGENTGATE_DATABASE_POOL_SIZE: ${AGENTGATE_DATABASE_POOL_SIZE:-5}
+      AGENTGATE_DATABASE_MAX_OVERFLOW: ${AGENTGATE_DATABASE_MAX_OVERFLOW:-5}
+      AGENTGATE_DATABASE_POOL_TIMEOUT_SECONDS: ${AGENTGATE_DATABASE_POOL_TIMEOUT_SECONDS:-5}
+      AGENTGATE_DATABASE_HEALTH_TIMEOUT_SECONDS: ${AGENTGATE_DATABASE_HEALTH_TIMEOUT_SECONDS:-2}
+      AGENTGATE_CORS_ALLOWED_ORIGINS: '${AGENTGATE_CORS_ALLOWED_ORIGINS:-["http://localhost:5173"]}'
+      AGENTGATE_MAX_REQUEST_BODY_BYTES: ${AGENTGATE_MAX_REQUEST_BODY_BYTES:-262144}
+      AGENTGATE_DOCS_ENABLED: ${AGENTGATE_DOCS_ENABLED:-true}
+      AGENTGATE_LOG_LEVEL: ${AGENTGATE_LOG_LEVEL:-INFO}
+      AGENTGATE_TOKEN_ISSUER: ${AGENTGATE_TOKEN_ISSUER:-agentgate.local}
+      AGENTGATE_TOKEN_AUDIENCE: ${AGENTGATE_TOKEN_AUDIENCE:-agentgate-tools}
+      AGENTGATE_ADMIN_TOKEN_AUDIENCE: ${AGENTGATE_ADMIN_TOKEN_AUDIENCE:-agentgate-admin}
+      AGENTGATE_TOKEN_SIGNING_KEY_ID: ${AGENTGATE_TOKEN_SIGNING_KEY_ID:-agentgate-local-ed25519-v1}
+      AGENTGATE_TOKEN_SIGNING_KEY_B64: ${AGENTGATE_TOKEN_SIGNING_KEY_B64:?Set a 32-byte base64url Ed25519 seed}
+      AGENTGATE_DATA_ENCRYPTION_KEY_B64: ${AGENTGATE_DATA_ENCRYPTION_KEY_B64:?Set a 32-byte base64url AES key}
+      AGENTGATE_AUDIT_HMAC_KEY_B64: ${AGENTGATE_AUDIT_HMAC_KEY_B64:?Set an independent 32-byte base64url audit key}
+      AGENTGATE_AUDIT_CHECKPOINT_PATH: /audit-checkpoint/audit-head.json
+      AGENTGATE_ADMIN_BOOTSTRAP_USERNAME: ${AGENTGATE_ADMIN_BOOTSTRAP_USERNAME:-local-admin}
+      AGENTGATE_ADMIN_BOOTSTRAP_SECRET: ${AGENTGATE_ADMIN_BOOTSTRAP_SECRET:?Set a local bootstrap secret of at least 32 bytes}
+      AGENTGATE_ACCESS_TOKEN_TTL_SECONDS: ${AGENTGATE_ACCESS_TOKEN_TTL_SECONDS:-300}
+      AGENTGATE_ADMIN_TOKEN_TTL_SECONDS: ${AGENTGATE_ADMIN_TOKEN_TTL_SECONDS:-900}
+      AGENTGATE_APPROVAL_TTL_SECONDS: ${AGENTGATE_APPROVAL_TTL_SECONDS:-180}
+      AGENTGATE_REQUEST_PROOF_TTL_SECONDS: ${AGENTGATE_REQUEST_PROOF_TTL_SECONDS:-30}
+      AGENTGATE_REQUEST_PROOF_CLOCK_SKEW_SECONDS: ${AGENTGATE_REQUEST_PROOF_CLOCK_SKEW_SECONDS:-5}
+      AGENTGATE_OPA_URL: http://opa:8181
+      AGENTGATE_OPA_TIMEOUT_SECONDS: ${AGENTGATE_OPA_TIMEOUT_SECONDS:-1}
+      AGENTGATE_OPA_MAX_RESPONSE_BYTES: ${AGENTGATE_OPA_MAX_RESPONSE_BYTES:-16384}
+      AGENTGATE_SYNTHETIC_DATA_ROOT: /synthetic_data
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log
+    depends_on:
+      postgres:
+        condition: service_healthy
+      opa:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2).read()
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks:
+      - agentgate-internal
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1770
+    volumes:
+      - ./synthetic_data/documents.json:/synthetic_data/documents.json:ro
+      - ./synthetic_data/tickets.json:/synthetic_data/tickets.json:ro
+      - ./synthetic_data/database.json:/synthetic_data/database.json:ro
+      - ./synthetic_data/sandbox:/synthetic_data/sandbox
+      - audit-checkpoint:/audit-checkpoint
+      - ./evaluations/scenarios:/evaluations/scenarios:ro
+      - ./scripts:/scripts:ro
+      - evaluation-reports:/evaluations/reports
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 100
+    init: true
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5173:8080"
+    networks:
+      - agentgate-internal
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1770,uid=101,gid=101
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 3s
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 50
+    init: true
+    restart: unless-stopped
+
+networks:
+  agentgate-internal:
+    internal: true
+
+volumes:
+  postgres-data:
+  audit-checkpoint:
+  evaluation-reports:

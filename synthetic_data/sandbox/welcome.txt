@@ -1,0 +1,4 @@
+AgentGate synthetic sandbox
+
+This file contains training-only data. The file adapters must remain confined to
+this directory and must never follow symbolic links or accept absolute paths.
