@@ -188,6 +188,7 @@ jobs:
         run: docker compose up --detach --wait --wait-timeout 180
       - name: Check host-visible health and frontend proxy
         run: |
+          curl --fail --silent --show-error http://127.0.0.1:8000/health/ready
           curl --fail --silent --show-error http://127.0.0.1:5173/healthz
           curl --fail --silent --show-error http://127.0.0.1:5173/api/health/ready
       - name: Run and persist the evaluation inside the API container
