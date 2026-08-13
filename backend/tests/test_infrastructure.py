@@ -72,6 +72,8 @@ def test_backend_container_uses_pinned_python_and_unprivileged_user() -> None:
     assert dockerfile.startswith("FROM python:3.12.13-slim-bookworm\n")
     assert '"pip==26.2.1"' in dockerfile
     assert "USER 10001:10001" in dockerfile
+    assert "mkdir -p /audit-checkpoint /evaluations/reports" in dockerfile
+    assert "chown 10001:10001 /audit-checkpoint /evaluations/reports" in dockerfile
     assert "--no-access-log" in dockerfile
 
 

@@ -15,8 +15,8 @@ RUN python -m pip install --upgrade "pip==26.2.1" \
     && python -m pip install . \
     && groupadd --gid 10001 agentgate \
     && useradd --uid 10001 --gid agentgate --no-create-home --shell /usr/sbin/nologin agentgate \
-    && mkdir /audit-checkpoint \
-    && chown 10001:10001 /audit-checkpoint
+    && mkdir -p /audit-checkpoint /evaluations/reports \
+    && chown 10001:10001 /audit-checkpoint /evaluations/reports
 
 USER 10001:10001
 
