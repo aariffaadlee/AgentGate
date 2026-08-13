@@ -33,18 +33,30 @@ def test_compose_keeps_database_internal_and_bounds_services() -> None:
     assert "./evaluations/scenarios:/evaluations/scenarios:ro" in api["volumes"]
     assert "./scripts:/scripts:ro" in api["volumes"]
     assert "evaluation-reports:/evaluations/reports" in api["volumes"]
-    assert api["pre_start"] == [
-        {
-            "command": [
-                "chown",
-                "10001:10001",
-                "/audit-checkpoint",
-                "/evaluations/reports",
-            ],
-            "user": "root",
-            "privileged": False,
-        }
+    volume_init = compose["services"]["volume-init"]
+    assert api["image"] == "agentgate-api:local"
+    assert volume_init["image"] == api["image"]
+    assert volume_init["command"] == [
+        "chown",
+        "10001:10001",
+        "/audit-checkpoint",
+        "/evaluations/reports",
     ]
+    assert volume_init["user"] == "0:0"
+    assert volume_init["network_mode"] == "none"
+    assert volume_init["read_only"] is True
+    assert volume_init["volumes"] == [
+        "audit-checkpoint:/audit-checkpoint",
+        "evaluation-reports:/evaluations/reports",
+    ]
+    assert volume_init["cap_drop"] == ["ALL"]
+    assert volume_init["cap_add"] == ["CHOWN"]
+    assert volume_init["security_opt"] == ["no-new-privileges:true"]
+    assert volume_init["restart"] == "no"
+    assert api["depends_on"]["volume-init"]["condition"] == (
+        "service_completed_successfully"
+    )
+    assert "pre_start" not in api
     assert "audit-checkpoint" in compose["volumes"]
     assert "evaluation-reports" in compose["volumes"]
     assert opa["image"] == "openpolicyagent/opa:1.18.2-static"

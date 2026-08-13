@@ -59,7 +59,32 @@ services:
     pids_limit: 50
     restart: unless-stopped
 
+  volume-init:
+    image: agentgate-api:local
+    command:
+      - chown
+      - 10001:10001
+      - /audit-checkpoint
+      - /evaluations/reports
+    user: "0:0"
+    network_mode: none
+    read_only: true
+    volumes:
+      - audit-checkpoint:/audit-checkpoint
+      - evaluation-reports:/evaluations/reports
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 32m
+    cpus: 0.25
+    pids_limit: 16
+    restart: "no"
+
   api:
+    image: agentgate-api:local
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -97,15 +122,9 @@ services:
       - sh
       - -c
       - alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log
-    pre_start:
-      - command:
-          - chown
-          - 10001:10001
-          - /audit-checkpoint
-          - /evaluations/reports
-        user: root
-        privileged: false
     depends_on:
+      volume-init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       opa:
