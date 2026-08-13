@@ -34,5 +34,9 @@ async def test_api_documentation_csp_is_restricted_when_enabled() -> None:
 
     assert response.status_code == 200
     csp = response.headers["content-security-policy"]
-    assert "https://cdn.jsdelivr.net" in csp
-    assert "frame-ancestors 'none'" in csp
+    assert csp == (
+        "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "img-src 'self' data: https://fastapi.tiangolo.com; connect-src 'self'; "
+        "frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    )
